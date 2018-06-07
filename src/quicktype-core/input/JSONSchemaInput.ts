@@ -517,7 +517,8 @@ export async function addTypesInSchema(
         attributes: TypeAttributes,
         properties: StringMap,
         requiredArray: string[],
-        additionalProperties: any
+        additionalProperties: any,
+        title: string
     ): Promise<TypeRef> {
         const required = new Set(requiredArray);
         const propertiesMap = mapSortBy(mapFromObject(properties), (_, k) => k.toLowerCase());
@@ -526,7 +527,7 @@ export async function addTypesInSchema(
             const t = await toType(
                 checkJSONSchema(propSchema, propLoc.canonicalRef),
                 propLoc,
-                makeNamesTypeAttributes(pluralize.singular(propName), true)
+                makeNamesTypeAttributes(getTitleFallbackAttributeName(title, propName), true)
             );
             const isOptional = !required.has(propName);
             return typeBuilder.makeClassProperty(t, isOptional);
@@ -557,6 +558,13 @@ export async function addTypesInSchema(
             mapMergeInto(props, additionalProps);
         }
         return typeBuilder.getUniqueObjectType(attributes, props, additionalPropertiesType);
+    }
+
+    function getTitleFallbackAttributeName(title: string, attributeName: string): string {
+        if (title) {
+            return title;
+        }
+        return pluralize.singular(attributeName);
     }
 
     async function convertToType(schema: StringMap, loc: Location, typeAttributes: TypeAttributes): Promise<TypeRef> {
@@ -686,7 +694,7 @@ export async function addTypesInSchema(
 
             const additionalProperties = schema.additionalProperties;
 
-            return await makeObject(loc, inferredAttributes, properties, required, additionalProperties);
+            return await makeObject(loc, inferredAttributes, properties, required, additionalProperties, schema.title);
         }
 
         async function makeTypesFromCases(cases: any, kind: string): Promise<TypeRef[]> {
@@ -695,6 +703,9 @@ export async function addTypesInSchema(
                 return messageError("SchemaSetOperationCasesIsNotArray", withRef(kindLoc, { operation: kind, cases }));
             }
             // FIXME: This cast shouldn't be necessary, but TypeScript forces our hand.
+            cases = cases.filter(
+                element => !(element["$ref"] !== undefined && element["$ref"].indexOf("extensible") > 0)
+            );
             return await arrayMapSync(cases, async (t, index) => {
                 const caseLoc = kindLoc.push(index.toString());
                 return await toType(
@@ -790,13 +801,19 @@ export async function addTypesInSchema(
             const [target, newLoc] = await resolveVirtualRef(loc, virtualRef);
             const attributes = modifyTypeNames(typeAttributes, tn => {
                 if (!defined(tn).areInferred) return tn;
-                return TypeNames.make(new Set([newLoc.canonicalRef.name]), new Set(), true);
+                const name = schema.title ? schema.title : newLoc.canonicalRef.name;
+                return TypeNames.make(new Set([name]), new Set(), true);
             });
             types.push(await toType(target, newLoc, attributes));
         }
 
         if (schema.allOf !== undefined) {
-            types.push(...(await makeTypesFromCases(schema.allOf, "allOf")));
+            let typeID = await makeTypesFromCases(schema.allOf, "allOf");
+            if (schema.title) {
+                let type = typeBuilder.typeAtIndex(typeID[0]);
+                type.title = schema.title;
+            }
+            types.push(...typeID);
         }
         if (schema.oneOf !== undefined) {
             types.push(await convertOneOrAnyOf(schema.oneOf, "oneOf"));

@@ -5,6 +5,7 @@ import { messageError, getStream, JSONSchemaStore, JSONSchema, parseJSON } from 
 // The typings for this module are screwy
 const isURL = require("is-url");
 const fetch = require("node-fetch");
+const os = require("os");
 
 export async function readableFromFileOrURL(fileOrURL: string): Promise<Readable> {
     try {
@@ -24,6 +25,8 @@ export async function readableFromFileOrURL(fileOrURL: string): Promise<Readable
 }
 
 export async function readFromFileOrURL(fileOrURL: string): Promise<string> {
+    fileOrURL = handleAdobeNamespace(fileOrURL);
+    fileOrURL = handleSchemaOrgNamespace(fileOrURL);
     const readable = await readableFromFileOrURL(fileOrURL);
     try {
         return await getStream(readable);
@@ -31,6 +34,23 @@ export async function readFromFileOrURL(fileOrURL: string): Promise<string> {
         const message = typeof e.message === "string" ? e.message : "Unknown error";
         return messageError("MiscReadError", { fileOrURL, message });
     }
+}
+
+function handleAdobeNamespace(address: string): string {
+    if (address.indexOf("ns.adobe.com") >= 0) {
+        //TODO: get from parameters or environment variables or scan all
+        let path = os.homedir() + "/work/xdm/schemas/";
+        address = address.replace(/https*:\/\/ns.adobe.com\/xdm/, path) + ".schema.json";
+        address = address.replace(/https*:\/\/ns.adobe.com\//, os.homedir() + "/work/xdm/extensions/adobe/");
+    }
+    return address;
+}
+
+function handleSchemaOrgNamespace(address: string): string {
+    if (address.indexOf("schema.org") >= 0) {
+        return address + ".jsonld";
+    }
+    return address;
 }
 
 export class FetchingJSONSchemaStore extends JSONSchemaStore {

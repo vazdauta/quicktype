@@ -86,9 +86,9 @@ export abstract class TypeNames {
         alternativeNames: ReadonlySet<string> | undefined,
         areInferred: boolean
     ): TypeNames {
-        if (names.size >= tooManyNamesThreshold) {
-            return new TooManyTypeNames(areInferred);
-        }
+        // if (names.size >= tooManyNamesThreshold) {
+        //     return new TooManyTypeNames(areInferred);
+        // }
 
         if (alternativeNames === undefined || alternativeNames.size > tooManyNamesThreshold) {
             alternativeNames = undefined;

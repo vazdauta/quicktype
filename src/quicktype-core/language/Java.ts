@@ -27,7 +27,7 @@ import { RenderContext } from "../Renderer";
 export const javaOptions = {
     justTypes: new BooleanOption("just-types", "Plain types only", false),
     // FIXME: Do this via a configurable named eventually.
-    packageName: new StringOption("package", "Generated package name", "NAME", "io.quicktype")
+    packageName: new StringOption("package", "Generated package name", "NAME", "com.adobe.platform.xdm")
 };
 
 export class JavaTargetLanguage extends TargetLanguage {
@@ -147,6 +147,9 @@ const legalizeName = utf16LegalizeCharacters(isPartCharacter);
 // just capitalize and concatenate.
 // https://stackoverflow.com/questions/8277355/naming-convention-for-upper-case-abbreviations
 function javaNameStyle(startWithUpper: boolean, upperUnderscore: boolean, original: string): string {
+    if (original.indexOf("http") >= 0) {
+        original = original.substr(original.lastIndexOf("/") + 1);
+    }
     const words = splitIntoWords(original);
     return combineWords(
         words,
@@ -572,7 +575,8 @@ export class JavaRenderer extends ConvenienceRenderer {
         this.emitPackageAndImports([
             "java.io.IOException",
             "com.fasterxml.jackson.databind.*",
-            "com.fasterxml.jackson.core.JsonProcessingException"
+            "com.fasterxml.jackson.core.JsonProcessingException",
+            "com.fasterxml.jackson.annotation.JsonInclude"
         ]);
         this.ensureBlankLine();
         this.emitBlock(["public class Converter"], () => {
@@ -616,6 +620,7 @@ export class JavaRenderer extends ConvenienceRenderer {
                     () => {
                         const renderedForClass = this.javaTypeWithoutGenerics(false, topLevelType);
                         this.emitLine("ObjectMapper mapper = new ObjectMapper();");
+                        this.emitLine("mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);");
                         this.emitLine(readerName, " = mapper.reader(", renderedForClass, ".class);");
                         this.emitLine(writerName, " = mapper.writerFor(", renderedForClass, ".class);");
                     }

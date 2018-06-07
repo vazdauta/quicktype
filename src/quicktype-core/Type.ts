@@ -83,6 +83,7 @@ export class TypeIdentity {
 export type MaybeTypeIdentity = TypeIdentity | undefined;
 
 export abstract class Type {
+    public title: string | undefined;
     constructor(readonly typeRef: TypeRef, protected readonly graph: TypeGraph, readonly kind: TypeKind) {}
 
     get index(): number {
@@ -110,6 +111,9 @@ export abstract class Type {
     }
 
     getNames(): TypeNames {
+        // if (this.title) {
+        //     return new RegularTypeNames(toReadonlySet([this.title]), undefined, false);
+        // }
         return defined(namesTypeAttributeKind.tryGetInAttributes(this.getAttributes()));
     }
 
